@@ -54,6 +54,6 @@ for message in consumer:
             assert metric_type in supported_metric_types
             statsd_message = '%s:%s|%s' % (metric_name, metric_value, metric_type)
             statsd_sock.sendto(statsd_message.encode('utf-8'), statsd_addr)
-            logging.info(statsd_message)
+            logging.debug(statsd_message)
     except (AssertionError, AttributeError, KeyError):
         pass
