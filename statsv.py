@@ -38,10 +38,12 @@ supported_metric_types = ('c', 'ms')
 statsd_addr = ('statsd.eqiad.wmnet', 8125)
 statsd_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 kafka = KafkaClient((
-    'analytics1012.eqiad.wmnet',
-    'analytics1018.eqiad.wmnet',
-    'analytics1021.eqiad.wmnet',
-    'analytics1022.eqiad.wmnet',
+    'kafka1012.eqiad.wmnet',
+    'kafka1013.eqiad.wmnet',
+    'kafka1014.eqiad.wmnet',
+    'kafka1018.eqiad.wmnet',
+    'kafka1020.eqiad.wmnet',
+    'kafka1022.eqiad.wmnet',
 ))
 
 consumer = SimpleConsumer(kafka, 'statsv', 'statsv')
