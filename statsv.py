@@ -34,7 +34,7 @@ from kafka import KafkaClient, SimpleConsumer
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO,
                     format='%(asctime)s %(message)s')
-supported_metric_types = ('c', 'ms')
+supported_metric_types = ('c', 'g', 'ms')
 statsd_addr = ('statsd.eqiad.wmnet', 8125)
 statsd_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 kafka = KafkaClient((
