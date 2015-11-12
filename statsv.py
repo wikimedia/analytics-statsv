@@ -30,21 +30,22 @@ import re
 import socket
 import urlparse
 
-from kafka import KafkaClient, SimpleConsumer
+from pykafka import KafkaClient
 
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO,
                     format='%(asctime)s %(message)s')
 supported_metric_types = ('c', 'g', 'ms')
 statsd_addr = ('statsd.eqiad.wmnet', 8125)
-kafka = KafkaClient((
-    'kafka1012.eqiad.wmnet',
-    'kafka1013.eqiad.wmnet',
-    'kafka1014.eqiad.wmnet',
-    'kafka1018.eqiad.wmnet',
-    'kafka1020.eqiad.wmnet',
-    'kafka1022.eqiad.wmnet',
-))
+
+kafka = KafkaClient(','.join((
+    'kafka1012.eqiad.wmnet:9092',
+    'kafka1013.eqiad.wmnet:9092',
+    'kafka1014.eqiad.wmnet:9092',
+    'kafka1018.eqiad.wmnet:9092',
+    'kafka1020.eqiad.wmnet:9092',
+    'kafka1022.eqiad.wmnet:9092',
+)))
 
 
 def worker(q):
@@ -77,6 +78,8 @@ worker_count = max(1, multiprocessing.cpu_count() // 2)
 for _ in range(worker_count):
     multiprocessing.Process(target=worker, args=(queue,)).start()
 
-consumer = SimpleConsumer(kafka, 'statsv', 'statsv')
+topic = kafka.topics['statsv']
+consumer = topic.get_simple_consumer()
 for message in consumer:
-    queue.put(message.message.value)
+    if message is not None:
+        queue.put(message.value)
