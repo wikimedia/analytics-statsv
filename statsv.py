@@ -48,7 +48,7 @@ kafka = KafkaClient(','.join((
 )))
 
 
-def worker(q):
+def process_queue(q):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     while 1:
         raw_data = q.get()
@@ -76,7 +76,9 @@ queue = multiprocessing.Queue()
 worker_count = max(1, multiprocessing.cpu_count() // 2)
 
 for _ in range(worker_count):
-    multiprocessing.Process(target=worker, args=(queue,)).start()
+    worker = multiprocessing.Process(target=process_queue, args=(queue,))
+    worker.daemon = True
+    worker.start()
 
 topic = kafka.topics['statsv']
 consumer = topic.get_simple_consumer()
