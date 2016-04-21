@@ -31,6 +31,7 @@ import socket
 import urlparse
 
 from pykafka import KafkaClient
+from pykafka.common import OffsetType
 
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO,
@@ -81,7 +82,7 @@ for _ in range(worker_count):
     worker.start()
 
 topic = kafka.topics['statsv']
-consumer = topic.get_simple_consumer()
+consumer = topic.get_simple_consumer(auto_offset_reset=OffsetType.LATEST)
 for message in consumer:
     if message is not None:
         queue.put(message.value)
