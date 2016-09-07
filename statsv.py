@@ -60,7 +60,7 @@ def process_queue(q):
         try:
             query_string = data['uri_query'].lstrip('?')
             for metric_name, value in urlparse.parse_qsl(query_string):
-                metric_value, metric_type = re.search('(\d+)(\D+)', value).groups()
+                metric_value, metric_type = re.search('^(\d+)([a-z]+)$', value).groups()
                 assert metric_type in supported_metric_types
                 statsd_message = '%s:%s|%s' % (metric_name, metric_value, metric_type)
                 sock.sendto(statsd_message.encode('utf-8'), statsd_addr)
