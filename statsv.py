@@ -34,6 +34,7 @@ from pykafka import KafkaClient
 from pykafka.common import OffsetType
 
 
+TIMEOUT_SECONDS = 60 * 1000
 logging.basicConfig(stream=sys.stderr, level=logging.INFO,
                     format='%(asctime)s %(message)s')
 supported_metric_types = ('c', 'g', 'ms')
@@ -60,14 +61,15 @@ def process_queue(q):
         try:
             query_string = data['uri_query'].lstrip('?')
             for metric_name, value in urlparse.parse_qsl(query_string):
-                metric_value, metric_type = re.search('^(\d+)([a-z]+)$', value).groups()
+                metric_value, metric_type = re.search(
+                        '^(\d+)([a-z]+)$', value).groups()
                 assert metric_type in supported_metric_types
-                statsd_message = '%s:%s|%s' % (metric_name, metric_value, metric_type)
+                statsd_message = '%s:%s|%s' % (
+                        metric_name, metric_value, metric_type)
                 sock.sendto(statsd_message.encode('utf-8'), statsd_addr)
                 logging.debug(statsd_message)
         except (AssertionError, AttributeError, KeyError):
             pass
-
 
 
 queue = multiprocessing.Queue()
@@ -82,7 +84,13 @@ for _ in range(worker_count):
     worker.start()
 
 topic = kafka.topics['statsv']
-consumer = topic.get_simple_consumer(auto_offset_reset=OffsetType.LATEST)
+consumer = topic.get_simple_consumer(
+        auto_offset_reset=OffsetType.LATEST,
+        consumer_timeout_ms=TIMEOUT_SECONDS * 1000)
 for message in consumer:
     if message is not None:
         queue.put(message.value)
+
+# If we reach this line, TIMEOUT_SECONDS elapsed with no events received.
+queue.close()
+raise RuntimeError('No messages received in %d seconds.' % TIMEOUT_SECONDS)
