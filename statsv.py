@@ -26,6 +26,7 @@ sys.setdefaultencoding('utf-8')
 import json
 import logging
 import multiprocessing
+import os
 import re
 import socket
 import urlparse
@@ -48,6 +49,53 @@ kafka = KafkaClient(','.join((
     'kafka1020.eqiad.wmnet:9092',
     'kafka1022.eqiad.wmnet:9092',
 )))
+
+SOCK_CLOEXEC = getattr(socket, 'SOCK_CLOEXEC', 0x80000)
+
+
+class Watchdog:
+    """
+    Simple notifier for systemd's process watchdog.
+
+    You can use this in message- or request-processing scripts that are
+    managed by systemd and that are under constant load, where the
+    absence of work is an abnormal condition.
+
+    Make sure the unit file contains `WatchdogSec=1` (or some other
+    value) and `Restart=always`. Then you can write something like:
+
+        watchdog = Watchdog()
+        while 1:
+            handle_request()
+            watchdog.notify()
+
+    This way, if the script spends a full second without handling a
+    request, systemd will restart it.
+
+    See https://www.freedesktop.org/software/systemd/man/systemd.service.html#WatchdogSec=
+    for more details about systemd's watchdog capabilities.
+    """
+
+    def __init__(self):
+        # Get and clear NOTIFY_SOCKET from the environment to prevent
+        # subprocesses from inheriting it.
+        self.addr = os.environ.pop('NOTIFY_SOCKET', None)
+        if not self.addr:
+            self.sock = None
+            return
+
+        # If the first character of NOTIFY_SOCKET is "@", the string is
+        # understood as an abstract socket address.
+        if self.addr.startswith('@'):
+            self.addr = '\0' + self.addr[1:]
+
+        self.sock = socket.socket(
+            socket.AF_UNIX, socket.SOCK_DGRAM | SOCK_CLOEXEC)
+
+    def notify(self):
+        if not self.sock:
+            return
+        self.sock.sendto(b'WATCHDOG=1', self.addr)
 
 
 def process_queue(q):
@@ -87,9 +135,13 @@ topic = kafka.topics['statsv']
 consumer = topic.get_simple_consumer(
         auto_offset_reset=OffsetType.LATEST,
         consumer_timeout_ms=TIMEOUT_SECONDS * 1000)
+
+watchdog = Watchdog()
+
 for message in consumer:
     if message is not None:
         queue.put(message.value)
+        watchdog.notify()
 
 # If we reach this line, TIMEOUT_SECONDS elapsed with no events received.
 queue.close()
