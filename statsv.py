@@ -31,27 +31,32 @@ import re
 import socket
 import urlparse
 
-from pykafka import KafkaClient
-from pykafka.common import OffsetType
+from kafka import KafkaConsumer
 
-
-TIMEOUT_SECONDS = 60 * 1000
 logging.basicConfig(stream=sys.stderr, level=logging.INFO,
                     format='%(asctime)s %(message)s')
+
+# Set kafka module logging level to INFO
+logging.getLogger("kafka").setLevel(logging.INFO)
+
+
 supported_metric_types = ('c', 'g', 'ms')
 statsd_addr = ('statsd.eqiad.wmnet', 8125)
 
-kafka = KafkaClient(','.join((
+# TODO: make these configurable.
+TIMEOUT_SECONDS = 60
+kafka_topic = 'statsv'
+kafka_consumer_group = 'statsv'
+kafka_bootstrap_servers = (
     'kafka1012.eqiad.wmnet:9092',
     'kafka1013.eqiad.wmnet:9092',
     'kafka1014.eqiad.wmnet:9092',
     'kafka1018.eqiad.wmnet:9092',
     'kafka1020.eqiad.wmnet:9092',
     'kafka1022.eqiad.wmnet:9092',
-)))
+)
 
 SOCK_CLOEXEC = getattr(socket, 'SOCK_CLOEXEC', 0x80000)
-
 
 class Watchdog:
     """
@@ -119,7 +124,6 @@ def process_queue(q):
         except (AssertionError, AttributeError, KeyError):
             pass
 
-
 queue = multiprocessing.Queue()
 
 # Spawn either half as many workers as there are CPU cores.
@@ -131,18 +135,28 @@ for _ in range(worker_count):
     worker.daemon = True
     worker.start()
 
-topic = kafka.topics['statsv']
-consumer = topic.get_simple_consumer(
-        auto_offset_reset=OffsetType.LATEST,
-        consumer_timeout_ms=TIMEOUT_SECONDS * 1000)
+consumer = KafkaConsumer(
+    kafka_topic,
+    bootstrap_servers=kafka_bootstrap_servers,
+    group_id=kafka_consumer_group,
+    auto_offset_reset='latest',
+    # statsd metrics don't make sense if they lag,
+    # so disable commits to avoid resuming at historical committed offset.
+    enable_auto_commit=False,
+    consumer_timeout_ms=TIMEOUT_SECONDS * 1000,
+)
 
 watchdog = Watchdog()
 
-for message in consumer:
-    if message is not None:
-        queue.put(message.value)
-        watchdog.notify()
-
-# If we reach this line, TIMEOUT_SECONDS elapsed with no events received.
-queue.close()
-raise RuntimeError('No messages received in %d seconds.' % TIMEOUT_SECONDS)
+try:
+    for message in consumer:
+        if message is not None:
+            queue.put(message.value)
+            watchdog.notify()
+    # If we reach this line, TIMEOUT_SECONDS elapsed with no events received.
+    raise RuntimeError('No messages received in %d seconds.' % TIMEOUT_SECONDS)
+except Exception as e:
+    logging.exception("Caught exception, aborting.")
+finally:
+    queue.close()
+    consumer.close()
