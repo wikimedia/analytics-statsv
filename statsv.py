@@ -102,7 +102,10 @@ verbose = args.verbose
 dry_run = args.dry_run
 
 # parse args for configuration
-statsd_addr = tuple(args.statsd.split(':'))
+statsd_addr = args.statsd.split(':')
+if len(statsd_addr) > 1:
+    statsd_addr[1] = int(statsd_addr[1])
+statsd_addr = tuple(statsd_addr)
 
 worker_count = args.workers
 
