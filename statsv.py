@@ -39,8 +39,8 @@ ap = argparse.ArgumentParser(
     description='statsv - consumes from varnishkafka Kafka topic and writes metrics to statsd'
 )
 ap.add_argument(
-    '--topic',
-    help='Kafka topic from which to consume.  Default: statsv',
+    '--topics',
+    help='Comma separated list of Kafka topics from which to consume.  Default: statsv',
     default='statsv'
 )
 ap.add_argument(
@@ -110,7 +110,8 @@ statsd_addr = tuple(statsd_addr)
 worker_count = args.workers
 
 kafka_bootstrap_servers = tuple(args.brokers.split(','))
-kafka_topic = args.topic
+kafka_topics = args.topics.split(',')
+
 kafka_consumer_group = args.consumer_group
 kafka_consumer_timeout_seconds = args.consumer_timeout_seconds
 
@@ -203,7 +204,7 @@ for _ in range(worker_count):
 
 # Create our Kafka Consumer instance.
 consumer = KafkaConsumer(
-    kafka_topic,
+    kafka_topics,
     bootstrap_servers=kafka_bootstrap_servers,
     group_id=kafka_consumer_group,
     auto_offset_reset='latest',
