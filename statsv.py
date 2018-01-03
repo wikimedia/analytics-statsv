@@ -204,7 +204,6 @@ for _ in range(worker_count):
 
 # Create our Kafka Consumer instance.
 consumer = KafkaConsumer(
-    kafka_topics,
     bootstrap_servers=kafka_bootstrap_servers,
     group_id=kafka_consumer_group,
     auto_offset_reset='latest',
@@ -213,6 +212,7 @@ consumer = KafkaConsumer(
     enable_auto_commit=False,
     consumer_timeout_ms=kafka_consumer_timeout_seconds * 1000
 )
+consumer.subscribe(kafka_topics)
 
 watchdog = Watchdog()
 
