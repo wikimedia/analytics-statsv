@@ -20,9 +20,6 @@
 
 """
 import sys
-reload(sys)
-sys.setdefaultencoding('utf-8')
-
 import json
 import logging
 import multiprocessing
@@ -210,6 +207,10 @@ consumer = KafkaConsumer(
     # statsd metrics don't make sense if they lag,
     # so disable commits to avoid resuming at historical committed offset.
     enable_auto_commit=False,
+    # Don't try to autodetect the api version, force 0.9 for now.  If the consumer
+    # supports higher versions than what the broker is running, it ends up throwing
+    # errors on the server when probing.
+    api_version = (0, 9),
     consumer_timeout_ms=kafka_consumer_timeout_seconds * 1000
 )
 consumer.subscribe(kafka_topics)
