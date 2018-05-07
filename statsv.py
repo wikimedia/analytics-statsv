@@ -86,6 +86,10 @@ ap.add_argument(
     type=int,
     default=max(1, multiprocessing.cpu_count() // 2)
 )
+ap.add_argument(
+    '--api-version',
+    default=None
+)
 
 args = ap.parse_args()
 
@@ -199,6 +203,15 @@ for _ in range(worker_count):
     worker.daemon = True
     worker.start()
 
+
+if args.api_version is not None:
+    # If api_version is given, don't try to autodetect the api version. If the consumer
+    # supports higher versions than what the broker is running, it ends up throwing
+    # errors on the server when probing.
+    kafka_api_version = tuple([int(i) for i in args.api_version.split('.')])
+else:
+    kafka_api_version = None
+
 # Create our Kafka Consumer instance.
 consumer = KafkaConsumer(
     bootstrap_servers=kafka_bootstrap_servers,
@@ -207,10 +220,7 @@ consumer = KafkaConsumer(
     # statsd metrics don't make sense if they lag,
     # so disable commits to avoid resuming at historical committed offset.
     enable_auto_commit=False,
-    # Don't try to autodetect the api version, force 0.9 for now.  If the consumer
-    # supports higher versions than what the broker is running, it ends up throwing
-    # errors on the server when probing.
-    api_version = (0, 9),
+    api_version=kafka_api_version,
     consumer_timeout_ms=kafka_consumer_timeout_seconds * 1000
 )
 consumer.subscribe(kafka_topics)
