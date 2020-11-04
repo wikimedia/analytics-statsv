@@ -26,9 +26,12 @@ import multiprocessing
 import os
 import re
 import socket
-import urlparse
 import argparse
 
+try:
+    import urllib.parse as urlparse # Python 3
+except ImportError:
+    import urlparse # Python 2
 
 from kafka import KafkaConsumer
 
