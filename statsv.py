@@ -175,7 +175,7 @@ def process_queue(q):
     while 1:
         raw_data = q.get()
         try:
-            data = json.loads(raw_data)
+            data = json.loads(raw_data.decode('utf-8'))
         except:
             logging.exception(raw_data)
         try:
