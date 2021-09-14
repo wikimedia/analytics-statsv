@@ -45,8 +45,19 @@ ap.add_argument(
 )
 ap.add_argument(
     '--brokers',
-    help='Comma separated string of kafka brokers: Default: localhost:9092',
-    default='localhost:9092'
+    help='Comma separated string of kafka brokers: Default: localhost:9092 or localhost:9093 (based on --security-protocol)',
+    default=None
+)
+ap.add_argument(
+    '--security-protocol',
+    help=' Protocol used to communicate with brokers. Valid values are: PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL. Default: PLAINTEXT',
+    choices=('PLAINTEXT', 'SSL', 'SASL_PLAINTEXT', 'SASL_SSL'),
+    default='PLAINTEXT'
+)
+ap.add_argument(
+    '--ssl-cafile',
+    help='Optional filename of certificate authority file to use in certificate verification.',
+    default=None
 )
 ap.add_argument(
     '--consumer-group',
@@ -113,9 +124,15 @@ statsd_addr = tuple(statsd_addr)
 
 worker_count = args.workers
 
-kafka_bootstrap_servers = tuple(args.brokers.split(','))
-kafka_topics = args.topics.split(',')
+if args.brokers is None:
+    if args.security_protocol in ("SSL", "SASL_SSL"):
+        kafka_bootstrap_servers = ("localhost:9093",)
+    else:
+        kafka_bootstrap_servers = ("localhost:9092",)
+else:
+    kafka_bootstrap_servers = tuple(args.brokers.split(','))
 
+kafka_topics = args.topics.split(',')
 kafka_consumer_group = args.consumer_group
 kafka_consumer_timeout_seconds = args.consumer_timeout_seconds
 
@@ -208,9 +225,9 @@ for _ in range(worker_count):
 
 
 if args.api_version is not None:
-    # If api_version is given, don't try to autodetect the api version. If the consumer
-    # supports higher versions than what the broker is running, it ends up throwing
-    # errors on the server when probing.
+    # If api_version is given, don't try to autodetect the api version. If the
+    # consumer supports higher versions than what the broker is running, it
+    # ends up throwing errors on the server when probing.
     kafka_api_version = tuple([int(i) for i in args.api_version.split('.')])
 else:
     kafka_api_version = None
@@ -218,10 +235,15 @@ else:
 # Create our Kafka Consumer instance.
 consumer = KafkaConsumer(
     bootstrap_servers=kafka_bootstrap_servers,
+    security_protocol=args.security_protocol,
+    ssl_cafile=args.ssl_cafile,
+    # Our Kafka brokers currently use the cluster name instead of hostname as
+    # CN in their TLS certificates.
+    ssl_check_hostname=False,
     group_id=kafka_consumer_group,
     auto_offset_reset='latest',
-    # statsd metrics don't make sense if they lag,
-    # so disable commits to avoid resuming at historical committed offset.
+    # statsd metrics don't make sense if they lag, so disable commits to avoid
+    # resuming at historical committed offset.
     enable_auto_commit=False,
     api_version=kafka_api_version,
     consumer_timeout_ms=kafka_consumer_timeout_seconds * 1000
